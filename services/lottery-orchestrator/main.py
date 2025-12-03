@@ -9,6 +9,7 @@ from typing import Optional
 if not os.getenv("PYTHONPATH"):
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
+import httpx
 from fastapi import FastAPI, HTTPException, Header
 from sqlalchemy import select, and_
 
@@ -25,9 +26,11 @@ setup_telemetry("lottery-orchestrator")
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/orchestrator")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+DRAW_SERVICE_URL = os.getenv("DRAW_SERVICE_URL", "http://lottery-draw:8003")
 
 db = Database(DATABASE_URL)
 redis_client = RedisStreamClient(REDIS_URL)
+http_client: httpx.AsyncClient = None
 
 background_tasks = set()
 
@@ -135,8 +138,31 @@ async def update_active_events_gauge():
         await asyncio.sleep(15)
 
 
+async def poll_draw_service():
+    """Poll lottery-draw service every 5 minutes for stats - creates HTTP traffic."""
+    await asyncio.sleep(60)  # Initial delay
+    while True:
+        try:
+            response = await http_client.get(f"{DRAW_SERVICE_URL}/stats", timeout=10.0)
+            stats = response.json()
+            logger.debug(
+                "Polled draw service stats",
+                extra={
+                    "draws_executed": stats.get("draws_executed"),
+                    "winners_selected": stats.get("winners_selected")
+                }
+            )
+        except Exception as e:
+            logger.warning(f"Failed to poll draw service: {e}")
+        
+        await asyncio.sleep(300)  # 5 minutes
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global http_client
+    
+    http_client = httpx.AsyncClient()
     await db.create_tables()
     await redis_client.connect()
     
@@ -151,7 +177,8 @@ async def lifespan(app: FastAPI):
             handle_draw_completed
         )
     )
-    background_tasks.update({task1, task2, task3, task4})
+    task5 = asyncio.create_task(poll_draw_service())
+    background_tasks.update({task1, task2, task3, task4, task5})
     
     logger.info("Lottery orchestrator started")
     yield
@@ -160,6 +187,7 @@ async def lifespan(app: FastAPI):
         task.cancel()
     await redis_client.close()
     await db.close()
+    await http_client.aclose()
 
 
 app = FastAPI(title="Lottery Orchestrator", lifespan=lifespan)

@@ -24,6 +24,8 @@ spec:
           value: postgresql+asyncpg://postgres:postgres@postgres:5432/orchestrator
         - name: REDIS_URL
           value: redis://redis:6379
+        - name: DRAW_SERVICE_URL
+          value: http://lottery-draw:8003
         - name: OTEL_EXPORTER_OTLP_ENDPOINT
           value: http://splunk-otel-collector-agent.default.svc.cluster.local:4317
         - name: OTEL_SERVICE_NAME

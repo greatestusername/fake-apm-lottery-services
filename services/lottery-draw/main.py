@@ -4,12 +4,14 @@ import sys
 import random
 import time
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 
 if not os.getenv("PYTHONPATH"):
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import httpx
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 
 from shared import (
     RedisStreamClient, create_health_router, configure_logging, metrics,
@@ -28,6 +30,12 @@ redis_client = RedisStreamClient(REDIS_URL)
 http_client: httpx.AsyncClient = None
 
 background_tasks = set()
+
+# Error simulation state for /stats endpoint
+stats_error_state = {
+    "remaining_errors": 0,
+    "next_error_window": datetime.utcnow() + timedelta(hours=random.uniform(1.5, 3.0))
+}
 
 
 async def fetch_valid_entries(event_id: str) -> list[dict]:
@@ -190,6 +198,33 @@ async def root():
 
 @app.get("/stats")
 async def get_stats():
+    """
+    Stats endpoint with occasional 307 redirects to simulate temporary issues.
+    Every 1.5-3 hours, returns 307 for 1-4 consecutive calls.
+    """
+    global stats_error_state
+    now = datetime.utcnow()
+    
+    # Check if we should start a new error window
+    if stats_error_state["remaining_errors"] == 0 and now >= stats_error_state["next_error_window"]:
+        stats_error_state["remaining_errors"] = random.randint(1, 4)
+        logger.warning(
+            f"Stats endpoint entering error mode for {stats_error_state['remaining_errors']} requests",
+            extra={"error_count": stats_error_state["remaining_errors"]}
+        )
+    
+    # If in error mode, return 307 and decrement counter
+    if stats_error_state["remaining_errors"] > 0:
+        stats_error_state["remaining_errors"] -= 1
+        
+        # If this was the last error, schedule next error window
+        if stats_error_state["remaining_errors"] == 0:
+            stats_error_state["next_error_window"] = now + timedelta(hours=random.uniform(1.5, 3.0))
+            logger.info("Stats endpoint exiting error mode")
+        
+        logger.warning("Stats endpoint returning 307 (simulated temporary redirect)")
+        return RedirectResponse(url="/stats", status_code=307)
+    
     return {
         "draws_executed": metrics.DRAWS_EXECUTED._value.get(),
         "winners_selected": metrics.WINNERS_SELECTED._value.get()
