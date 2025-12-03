@@ -1,0 +1,64 @@
+# Splunk OpenTelemetry Collector Helm Values
+# 
+# Deploy with:
+#   helm repo add splunk-otel-collector-chart https://signalfx.github.io/splunk-otel-collector-chart
+#   helm install splunk-otel-collector splunk-otel-collector-chart/splunk-otel-collector \
+#     --namespace lottery \
+#     --values values.yaml \
+#     --set splunkObservability.realm=$SPLUNK_REALM \
+#     --set splunkObservability.accessToken=$SPLUNK_ACCESS_TOKEN
+
+clusterName: "lottery-cluster"
+
+splunkObservability:
+  realm: ""  # Set via --set or environment: us0, us1, eu0, etc.
+  accessToken: ""  # Set via --set or environment
+  
+  # Send traces, metrics, and logs to Splunk Observability
+  metricsEnabled: true
+  tracesEnabled: true
+  logsEnabled: true
+
+# Collect logs from pods
+logsEngine: otel
+
+# Agent configuration - runs on every node
+agent:
+  enabled: true
+  
+  resources:
+    limits:
+      cpu: 200m
+      memory: 500Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+# Gateway/Collector configuration - centralized collection point
+gateway:
+  enabled: true
+  replicaCount: 1
+  
+  resources:
+    limits:
+      cpu: 500m
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 512Mi
+
+# Kubernetes cluster receiver for k8s metrics
+clusterReceiver:
+  enabled: true
+
+# Environment detection
+environment: "lottery-production"
+
+# Service annotations for discovery
+autodetect:
+  prometheus: true
+  istio: false
+
+# Additional OTLP receivers for application traces
+# Applications should send to otel-collector:4317 (gRPC) or otel-collector:4318 (HTTP)
+

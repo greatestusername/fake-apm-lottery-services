@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lottery-draw
+  namespace: lottery
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lottery-draw
+  template:
+    metadata:
+      labels:
+        app: lottery-draw
+    spec:
+      containers:
+      - name: lottery-draw
+        image: quay.io/jeremyh/lottery-draw:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8003
+        env:
+        - name: REDIS_URL
+          value: redis://redis:6379
+        - name: ENTRIES_SERVICE_URL
+          value: http://lottery-entries:8002
+        - name: ORCHESTRATOR_URL
+          value: http://lottery-orchestrator:8000
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://splunk-otel-collector:4317
+        - name: OTEL_SERVICE_NAME
+          value: lottery-draw
+        - name: DEPLOYMENT_ENV
+          value: production
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8003
+          initialDelaySeconds: 10
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8003
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lottery-draw
+  namespace: lottery
+spec:
+  selector:
+    app: lottery-draw
+  ports:
+  - port: 8003
+    targetPort: 8003
+

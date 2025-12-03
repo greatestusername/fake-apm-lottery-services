@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lottery
+  labels:
+    app.kubernetes.io/name: lottery-system
+

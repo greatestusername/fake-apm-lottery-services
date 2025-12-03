@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadgenerator
+  namespace: lottery
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loadgenerator
+  template:
+    metadata:
+      labels:
+        app: loadgenerator
+    spec:
+      containers:
+      - name: loadgenerator
+        image: quay.io/jeremyh/loadgenerator:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+        env:
+        - name: ORCHESTRATOR_URL
+          value: http://lottery-orchestrator:8000
+        - name: ENTRIES_URL
+          value: http://lottery-entries:8002
+        - name: MIN_EVENT_INTERVAL_MINUTES
+          value: "30"
+        - name: MAX_EVENT_INTERVAL_MINUTES
+          value: "120"
+        - name: CHEATER_PERCENTAGE
+          value: "0.10"
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://splunk-otel-collector:4317
+        - name: OTEL_SERVICE_NAME
+          value: loadgenerator
+        - name: DEPLOYMENT_ENV
+          value: production
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: loadgenerator
+  namespace: lottery
+spec:
+  selector:
+    app: loadgenerator
+  ports:
+  - port: 8080
+    targetPort: 8080
+
