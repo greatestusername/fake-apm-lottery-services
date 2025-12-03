@@ -31,7 +31,7 @@ spec:
         - name: OTEL_SERVICE_NAME
           value: lottery-draw
         - name: DEPLOYMENT_ENV
-          value: production
+          value: apm-anomaly-detection
         resources:
           requests:
             memory: "64Mi"

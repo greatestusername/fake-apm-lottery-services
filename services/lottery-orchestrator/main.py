@@ -6,10 +6,7 @@ from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 from typing import Optional
 
-# Handle imports for both container (PYTHONPATH set) and local dev
-if os.getenv("PYTHONPATH"):
-    pass
-else:
+if not os.getenv("PYTHONPATH"):
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from fastapi import FastAPI, HTTPException, Header

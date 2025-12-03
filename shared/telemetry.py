@@ -20,7 +20,7 @@ def setup_telemetry(service_name: str, service_version: str = "1.0.0"):
     Environment variables:
         OTEL_EXPORTER_OTLP_ENDPOINT: Collector endpoint (default: http://otel-collector:4317)
         OTEL_SERVICE_NAME: Override service name
-        DEPLOYMENT_ENV: Environment name (default: production)
+        DEPLOYMENT_ENV: Environment name (default: apm-anomaly-detection)
         OTEL_ENABLED: Set to "false" to disable (default: true)
     """
     if os.getenv("OTEL_ENABLED", "true").lower() == "false":
@@ -28,7 +28,7 @@ def setup_telemetry(service_name: str, service_version: str = "1.0.0"):
         return None
     
     endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4317")
-    env_name = os.getenv("DEPLOYMENT_ENV", "production")
+    env_name = os.getenv("DEPLOYMENT_ENV", "apm-anomaly-detection")
     
     resource = Resource.create({
         SERVICE_NAME: os.getenv("OTEL_SERVICE_NAME", service_name),

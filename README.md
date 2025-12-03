@@ -57,7 +57,7 @@ VALUES_FILE=./my-values.yaml ./helm/splunk-otel-collector/install.sh
 |----------|---------|-------------|
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://splunk-otel-collector:4317` | OTel collector endpoint |
 | `OTEL_ENABLED` | `true` | Set to `false` to disable tracing |
-| `DEPLOYMENT_ENV` | `production` | Environment name |
+| `DEPLOYMENT_ENV` | `apm-anomaly-detection` | Environment name |
 
 ### Load Generator
 

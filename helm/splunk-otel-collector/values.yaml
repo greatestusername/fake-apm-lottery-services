@@ -52,7 +52,7 @@ clusterReceiver:
   enabled: true
 
 # Environment detection
-environment: "lottery-production"
+environment: "apm-anomaly-detection"
 
 # Service annotations for discovery
 autodetect:

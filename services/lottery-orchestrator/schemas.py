@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 
 class CreateEventRequest(BaseModel):
@@ -9,13 +9,6 @@ class CreateEventRequest(BaseModel):
     total_items: int = Field(..., ge=10, le=200)
     expires_in_minutes: int = Field(..., ge=30, le=240)
     idempotency_key: Optional[str] = None
-    
-    @field_validator("total_items")
-    @classmethod
-    def validate_items(cls, v):
-        if v < 10 or v > 200:
-            raise ValueError("total_items must be between 10 and 200")
-        return v
 
 
 class EventResponse(BaseModel):

@@ -29,7 +29,7 @@ spec:
         - name: OTEL_SERVICE_NAME
           value: lottery-orchestrator
         - name: DEPLOYMENT_ENV
-          value: production
+          value: apm-anomaly-detection
         resources:
           requests:
             memory: "128Mi"
