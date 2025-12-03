@@ -22,6 +22,7 @@ for SERVICE in "${SERVICES[@]}"; do
     echo "=== Building ${SERVICE} ==="
     
     docker build \
+        --platform linux/amd64 \
         -t "${IMAGE}" \
         -f "services/${SERVICE}/Dockerfile" \
         .
