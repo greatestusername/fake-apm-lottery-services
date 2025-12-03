@@ -141,7 +141,7 @@ async def handle_event_expired(payload: dict):
     
     logger.info(
         f"Received expired event notification",
-        extra={"event_id": event_id, "name": event_name}
+        extra={"event_id": event_id, "event_name": event_name}
     )
     
     await execute_draw(event_id, event_name, total_items)

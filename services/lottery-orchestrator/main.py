@@ -55,7 +55,7 @@ async def check_expired_events():
                     event.status = EventStatus.EXPIRED
                     logger.info(
                         f"Event expired: {event.name}",
-                        extra={"event_id": event.id, "name": event.name}
+                        extra={"event_id": event.id, "event_name": event.name}
                     )
                     await redis_client.publish(STREAM_EVENTS_EXPIRED, {
                         "event_id": event.id,
@@ -217,7 +217,7 @@ async def create_event(
             f"Event created: {event.name}",
             extra={
                 "event_id": event_id,
-                "name": event.name,
+                "event_name": event.name,
                 "total_items": event.total_items,
                 "expires_at": expires_at.isoformat()
             }
