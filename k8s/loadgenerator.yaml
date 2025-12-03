@@ -27,7 +27,7 @@ spec:
         - name: MIN_EVENT_INTERVAL_MINUTES
           value: "30"
         - name: MAX_EVENT_INTERVAL_MINUTES
-          value: "120"
+          value: "55"
         - name: CHEATER_PERCENTAGE
           value: "0.10"
         - name: OTEL_EXPORTER_OTLP_ENDPOINT
