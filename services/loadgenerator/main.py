@@ -159,9 +159,26 @@ async def submit_entry(event_id: str, user_data: dict, is_cheater: bool = False)
 
 
 async def generate_entries_for_event(event: dict):
-    """Generate entries for an event, including some cheater entries."""
+    """Generate entries for an event. 10% chance of single-entry anomaly."""
     event_id = event["id"]
     total_items = event["total_items"]
+    
+    # 10% chance: single entry anomaly (low participation event)
+    is_low_participation = random.random() < 0.10
+    
+    if is_low_participation:
+        logger.warning(
+            f"Low participation event (anomaly): only 1 entry",
+            extra={"event_id": event_id, "anomaly_type": "low_participation"}
+        )
+        user_data = {
+            "user_id": generate_user_id(),
+            "username": generate_username(),
+            "account_id": generate_account_id(),
+            "phone": generate_phone()
+        }
+        await submit_entry(event_id, user_data)
+        return
     
     entry_count = random.randint(total_items * 2, total_items * 5)
     cheater_count = int(entry_count * CHEATER_PERCENTAGE)
