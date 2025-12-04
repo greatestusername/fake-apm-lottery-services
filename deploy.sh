@@ -35,12 +35,18 @@ fi
 kubectl apply -f k8s/lottery-orchestrator.yaml
 kubectl apply -f k8s/lottery-entries.yaml
 
-# Services that send Splunk events need the env vars substituted
-export SPLUNK_REALM="${SPLUNK_REALM:-us1}"
-export SPLUNK_ACCESS_TOKEN="${SPLUNK_ACCESS_TOKEN:-}"
-envsubst < k8s/user-notification.yaml | kubectl apply -f -
-envsubst < k8s/lottery-draw.yaml | kubectl apply -f -
-envsubst < k8s/loadgenerator.yaml | kubectl apply -f -
+# Create/update Splunk secret from env vars (for anomaly event sending)
+if [ -n "$SPLUNK_ACCESS_TOKEN" ]; then
+    kubectl create secret generic splunk-observability -n lottery \
+        --from-literal=realm="${SPLUNK_REALM:-us1}" \
+        --from-literal=access-token="$SPLUNK_ACCESS_TOKEN" \
+        --dry-run=client -o yaml | kubectl apply -f -
+    echo "Created/updated splunk-observability secret"
+fi
+
+kubectl apply -f k8s/user-notification.yaml
+kubectl apply -f k8s/lottery-draw.yaml
+kubectl apply -f k8s/loadgenerator.yaml
 
 echo ""
 echo "Deployment complete!"

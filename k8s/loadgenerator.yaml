@@ -37,9 +37,17 @@ spec:
         - name: DEPLOYMENT_ENV
           value: apm-anomaly-detection
         - name: SPLUNK_REALM
-          value: "${SPLUNK_REALM}"
+          valueFrom:
+            secretKeyRef:
+              name: splunk-observability
+              key: realm
+              optional: true
         - name: SPLUNK_ACCESS_TOKEN
-          value: "${SPLUNK_ACCESS_TOKEN}"
+          valueFrom:
+            secretKeyRef:
+              name: splunk-observability
+              key: access-token
+              optional: true
         resources:
           requests:
             memory: "64Mi"
