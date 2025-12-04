@@ -10,6 +10,7 @@ from .database import Database, Base
 from .health import create_health_router
 from .logging_config import configure_logging
 from .telemetry import setup_telemetry, instrument_fastapi, get_tracer
+from .splunk_events import send_anomaly_event
 from . import metrics
 
 __all__ = [
@@ -26,6 +27,7 @@ __all__ = [
     "setup_telemetry",
     "instrument_fastapi",
     "get_tracer",
+    "send_anomaly_event",
     "metrics",
 ]
 

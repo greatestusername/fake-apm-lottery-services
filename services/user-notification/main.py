@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from shared import (
     RedisStreamClient, create_health_router, configure_logging, metrics,
     STREAM_EVENTS_CREATED, STREAM_WINNERS_SELECTED,
-    setup_telemetry, instrument_fastapi
+    setup_telemetry, instrument_fastapi, send_anomaly_event
 )
 
 logger = configure_logging("user-notification")
@@ -236,6 +236,12 @@ async def sms_gateway(request: SMSRequest):
         logger.warning(
             f"SMS delivery failed (simulated)",
             extra={"phone": request.phone[-4:], "event_id": request.event_id}
+        )
+        await send_anomaly_event(
+            event_type="anomalous_sms_delivery_failure",
+            service="user-notification",
+            dimensions={"anomaly_type": "sms_failure", "event_id": request.event_id or "unknown"},
+            properties={"notification_type": request.notification_type}
         )
         return {"status": "failed", "latency_ms": int(delay * 1000)}
     

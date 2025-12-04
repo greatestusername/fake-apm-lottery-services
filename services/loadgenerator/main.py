@@ -13,7 +13,7 @@ if not os.getenv("PYTHONPATH"):
 import httpx
 from fastapi import FastAPI
 
-from shared import create_health_router, configure_logging, setup_telemetry, instrument_fastapi
+from shared import create_health_router, configure_logging, setup_telemetry, instrument_fastapi, send_anomaly_event
 
 logger = configure_logging("loadgenerator")
 setup_telemetry("loadgenerator")
@@ -221,6 +221,12 @@ async def generate_entries_for_event(event: dict):
             f"Low participation event (anomaly): only 1 entry",
             extra={"event_id": event_id, "anomaly_type": "low_participation"}
         )
+        await send_anomaly_event(
+            event_type="anomalous_low_participation",
+            service="loadgenerator",
+            dimensions={"event_id": event_id, "anomaly_type": "low_participation"},
+            properties={"total_items": total_items, "entry_count": 1}
+        )
         user_data = {
             "user_id": generate_user_id(),
             "username": generate_username(),
@@ -229,6 +235,10 @@ async def generate_entries_for_event(event: dict):
         }
         await submit_entry(event_id, user_data)
         return
+    
+    # 5% chance: burst mode - high traffic spike during the event
+    is_burst_event = random.random() < 0.05
+    burst_entries_per_second = random.randint(10, 25) if is_burst_event else 0
     
     # Calculate total entries and timing
     entry_count = random.randint(total_items * 2, total_items * 5)
@@ -239,16 +249,35 @@ async def generate_entries_for_event(event: dict):
     # Average delay between entries to spread them over the available time
     avg_delay = available_seconds / total_entries
     
-    logger.info(
-        f"Generating {total_entries} entries over {int(available_seconds/60)} minutes",
-        extra={
-            "event_id": event_id,
-            "total_items": total_items,
-            "legit_count": legit_count,
-            "cheater_count": cheater_count,
-            "avg_delay_seconds": round(avg_delay, 2)
-        }
-    )
+    log_extra = {
+        "event_id": event_id,
+        "total_items": total_items,
+        "legit_count": legit_count,
+        "cheater_count": cheater_count,
+        "avg_delay_seconds": round(avg_delay, 2)
+    }
+    
+    if is_burst_event:
+        log_extra["burst_mode"] = True
+        log_extra["burst_entries_per_second"] = burst_entries_per_second
+        logger.warning(
+            f"BURST EVENT: Generating {total_entries} entries with {burst_entries_per_second}/sec bursts",
+            extra=log_extra
+        )
+        await send_anomaly_event(
+            event_type="anomalous_traffic_burst",
+            service="loadgenerator",
+            dimensions={"event_id": event_id, "anomaly_type": "traffic_burst"},
+            properties={
+                "total_entries": total_entries,
+                "burst_entries_per_second": burst_entries_per_second,
+            }
+        )
+    else:
+        logger.info(
+            f"Generating {total_entries} entries over {int(available_seconds/60)} minutes",
+            extra=log_extra
+        )
     
     valid_users = []
     entries_submitted = 0
@@ -257,11 +286,32 @@ async def generate_entries_for_event(event: dict):
     entry_types = ["legit"] * legit_count + ["cheater"] * cheater_count
     random.shuffle(entry_types)
     
+    # Track burst state
+    next_burst_time = None
+    in_burst = False
+    burst_remaining = 0
+    
+    if is_burst_event:
+        # Schedule first burst randomly within the first half of the event
+        next_burst_time = datetime.utcnow() + timedelta(seconds=random.uniform(60, available_seconds * 0.4))
+    
     for entry_type in entry_types:
+        now = datetime.utcnow()
+        
         # Check if we've passed the cutoff
-        if datetime.utcnow() >= cutoff_time:
+        if now >= cutoff_time:
             logger.info(f"Reached cutoff time, stopping entries", extra={"event_id": event_id})
             break
+        
+        # Handle burst mode timing
+        if is_burst_event and next_burst_time and now >= next_burst_time and not in_burst:
+            # Start a burst
+            in_burst = True
+            burst_remaining = random.randint(burst_entries_per_second * 3, burst_entries_per_second * 8)
+            logger.warning(
+                f"Starting entry burst: {burst_remaining} entries at high rate",
+                extra={"event_id": event_id, "burst_size": burst_remaining}
+            )
         
         if entry_type == "legit":
             user_data = {
@@ -303,8 +353,28 @@ async def generate_entries_for_event(event: dict):
         
         entries_submitted += 1
         
-        # Random delay around the average (0.5x to 1.5x) for realistic variation
-        delay = avg_delay * random.uniform(0.5, 1.5)
+        # Handle delay based on burst state
+        if in_burst and burst_remaining > 0:
+            # During burst: very fast submissions (10-25 per second)
+            delay = 1.0 / burst_entries_per_second * random.uniform(0.8, 1.2)
+            burst_remaining -= 1
+            
+            if burst_remaining == 0:
+                # End of burst, schedule next one
+                in_burst = False
+                remaining_time = (cutoff_time - datetime.utcnow()).total_seconds()
+                if remaining_time > 120:
+                    next_burst_time = datetime.utcnow() + timedelta(
+                        seconds=random.uniform(60, min(remaining_time * 0.5, 600))
+                    )
+                    logger.info(f"Burst complete, next burst in {int((next_burst_time - datetime.utcnow()).total_seconds())}s",
+                               extra={"event_id": event_id})
+                else:
+                    next_burst_time = None
+        else:
+            # Normal mode: spread entries over available time
+            delay = avg_delay * random.uniform(0.5, 1.5)
+        
         await asyncio.sleep(delay)
     
     logger.info(

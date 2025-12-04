@@ -2,7 +2,48 @@
 
 **THIS IS 100% AN EXERCISE IN CHATGIBBITYGENERATION OF CODE. HOOMONS DID NOT WROTE THIS CODE ORIGINALLY.**
 
-Event-driven microservices system for testing APM aperiodic/anomaly detection. Services communicate via Redis Streams.
+Event-driven "Lottery Drop" for rare merch. Microservices (APM) for testing APM aperiodic/anomaly detection. Services communicate via Redis Streams.
+- Repo also includes some anomalous metrics scripts in `./
+other-metric-anomaly-scripts`
+
+## Anomalous & Aperiodic Behaviors
+
+Designed to test APM anomaly detection. The following behaviors are injected:
+
+### Aperiodic Timing
+
+| Behavior | Frequency | Description |
+|----------|-----------|-------------|
+| Event creation | 20-55 min (configurable) | New lottery events are created at random intervals |
+| Event entrance expiry | 30-240 min after creation | Each event has a randomized lifespan before the draw triggers |
+| Draws | Only on event entrance expiry | `lottery-draw` only executes when entrance to the event is closed (fully event-driven) |
+
+### Simulated Anomalies
+
+| Anomaly | Service | Frequency | Splunk Event |
+|---------|---------|-----------|--------------|
+| Low participation | `loadgenerator` | 10% of events get only 1 entry | `anomalous_low_participation` |
+| Traffic burst | `loadgenerator` | 5% of events get 10-25 entry/sec bursts | `anomalous_traffic_burst` |
+| Fraudulent entries | `loadgenerator` → `lottery-entries` | ~10% of entries use duplicate user/account/phone | — |
+| Stats endpoint 506s | `lottery-draw` | Every 1.5-3 hours, 1-4 consecutive 506s | `anomalous_stats_endpoint_506` |
+| SMS delivery failure | `user-notification` | 2% of individual SMS messages fail | `anomalous_sms_delivery_failure` |
+
+### Variable Latency
+
+| Operation | Latency Range | Service |
+|-----------|---------------|---------|
+| Individual SMS | 100-2000ms | `user-notification` |
+| Broadcast SMS | 500-3000ms | `user-notification` |
+
+### Configuration
+
+Anomaly-related environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MIN_EVENT_INTERVAL_MINUTES` | `20` | Min time between event creation |
+| `MAX_EVENT_INTERVAL_MINUTES` | `55` | Max time between event creation |
+| `CHEATER_PERCENTAGE` | `0.10` | Fraction of entries that trigger fraud detection |
 
 ## Services
 
@@ -10,7 +51,7 @@ Event-driven microservices system for testing APM aperiodic/anomaly detection. S
 |---------|------|-------------|
 | lottery-orchestrator | 8000 | Event lifecycle management, expiry detection |
 | lottery-entries | 8002 | Entry submission, fraud detection |
-| lottery-draw | 8003 | **Aperiodic** winner selection (triggers on event expiry) |
+| lottery-draw | 8003 | **Aperiodic** winner selection (triggers when entry period closes) |
 | user-notification | 8001 | Fake SMS logging |
 | loadgenerator | 8080 | Traffic generation (events every 30-120 min) |
 
@@ -97,7 +138,7 @@ lottery-orchestrator ──► Redis Stream: events:created ──► user-notif
      │
      │ (30s expiry check)
      ▼
-Redis Stream: events:expired
+Redis Stream: events:expired (entrance closed)
      │
      ▼
 lottery-draw ──► lottery-entries (GET valid entries)
@@ -119,6 +160,7 @@ pip install -r requirements.txt
 cd services/lottery-orchestrator
 python main.py
 ```
+
 
 ## Monitoring
 

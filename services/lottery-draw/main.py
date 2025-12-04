@@ -11,12 +11,12 @@ if not os.getenv("PYTHONPATH"):
 
 import httpx
 from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse
 
 from shared import (
     RedisStreamClient, create_health_router, configure_logging, metrics,
     STREAM_EVENTS_EXPIRED, STREAM_WINNERS_SELECTED, STREAM_DRAW_COMPLETED,
-    setup_telemetry, instrument_fastapi
+    setup_telemetry, instrument_fastapi, send_anomaly_event
 )
 
 logger = configure_logging("lottery-draw")
@@ -199,8 +199,8 @@ async def root():
 @app.get("/stats")
 async def get_stats():
     """
-    Stats endpoint with occasional 307 redirects to simulate temporary issues.
-    Every 1.5-3 hours, returns 307 for 1-4 consecutive calls.
+    Stats endpoint with occasional 506 errors to simulate variant issues.
+    Every 1.5-3 hours, returns 506 for 1-4 consecutive calls.
     """
     global stats_error_state
     now = datetime.utcnow()
@@ -212,8 +212,14 @@ async def get_stats():
             f"Stats endpoint entering error mode for {stats_error_state['remaining_errors']} requests",
             extra={"error_count": stats_error_state["remaining_errors"]}
         )
+        await send_anomaly_event(
+            event_type="anomalous_stats_endpoint_506",
+            service="lottery-draw",
+            dimensions={"anomaly_type": "http_506_error", "endpoint": "/stats"},
+            properties={"error_count": stats_error_state["remaining_errors"]}
+        )
     
-    # If in error mode, return 307 and decrement counter
+    # If in error mode, return 506 and decrement counter
     if stats_error_state["remaining_errors"] > 0:
         stats_error_state["remaining_errors"] -= 1
         
@@ -222,8 +228,8 @@ async def get_stats():
             stats_error_state["next_error_window"] = now + timedelta(hours=random.uniform(1.5, 3.0))
             logger.info("Stats endpoint exiting error mode")
         
-        logger.warning("Stats endpoint returning 307 (simulated temporary redirect)")
-        return RedirectResponse(url="/stats", status_code=307)
+        logger.warning("Stats endpoint returning 506 (simulated variant error)")
+        return JSONResponse(status_code=506, content={"error": "Variant Also Negotiates"})
     
     return {
         "draws_executed": metrics.DRAWS_EXECUTED._value.get(),

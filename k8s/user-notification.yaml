@@ -28,6 +28,10 @@ spec:
           value: user-notification
         - name: DEPLOYMENT_ENV
           value: apm-anomaly-detection
+        - name: SPLUNK_REALM
+          value: "${SPLUNK_REALM}"
+        - name: SPLUNK_ACCESS_TOKEN
+          value: "${SPLUNK_ACCESS_TOKEN}"
         resources:
           requests:
             memory: "64Mi"
